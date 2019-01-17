@@ -6,7 +6,10 @@ import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Response;
 
-public class DownloadRunnable implements Runnable{
+/**
+ * 文件下载的执行者
+ */
+public class DownloadExecutor implements Runnable{
 
     private final String url;
     private final int runId;
@@ -14,13 +17,16 @@ public class DownloadRunnable implements Runnable{
     private final DownloadFileCallback mDownloadFileCallback;
 
 
-    public DownloadRunnable(String url,int runId,DownloadFileCallback downloadFileCallback){
+    public DownloadExecutor(String url, int runId, DownloadFileCallback downloadFileCallback){
         this.url = url;
         this.runId = runId;
         this.mDownloadCallback = new DownloadCallback();
         this.mDownloadFileCallback = downloadFileCallback;
     }
 
+    /**
+     * 文件下载回调
+     */
     public interface DownloadFileCallback{
         void onFailure(IOException e);
         void onResponse(String url,int runId);
@@ -37,6 +43,9 @@ public class DownloadRunnable implements Runnable{
     }
 
 
+    /**
+     * okhttp回调接口
+     */
     private class DownloadCallback implements Callback{
 
         @Override

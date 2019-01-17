@@ -1,19 +1,18 @@
 package com.rong.download;
 
-import android.content.Context;
-
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import okhttp3.Cache;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 
+/**
+ * http下载工具类
+ */
 public class HttpUtils {
     private static final AtomicReference<HttpUtils> INSTANCE = new AtomicReference<>();
     private final OkHttpClient mOkHttpClient;
@@ -67,16 +66,23 @@ public class HttpUtils {
         return call.execute();
     }
 
-
+    /**
+     * 通过GET异步请求下载文件
+     */
     public void downloadAsyncFile(String url,Callback callback) throws IOException {
         Request request = new Request.Builder()
+                .get()
                 .url(url)
                 .build();
         doAsync(request,callback);
     }
 
+    /**
+     * 通过GET同步请求下载文件
+     */
     public Response downloadSyncFile(String url) throws IOException {
         Request request = new Request.Builder()
+                .get()
                 .url(url)
                 .build();
         return doSync(request);
