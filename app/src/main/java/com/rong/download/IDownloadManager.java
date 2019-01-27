@@ -16,11 +16,15 @@ public interface IDownloadManager {
 
      void startDownload();
 
-     void onFailure(String url,Exception e);
-
-     void onResponse(String url);
-
-     void onComplete(String url);
-
      void onDestroy();
+
+     void setDownloadFileListener(DownloadFileListener listener);
+
+     public interface DownloadFileListener{
+          void onFailure(String url,Exception e);
+
+          void onResponse(String url);
+
+          void onComplete(String url);
+     }
 }

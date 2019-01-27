@@ -16,20 +16,10 @@ public final class DownloadManagerImpl implements IDownloadManager {
 
     }
 
-    @Override
-    public void onFailure(String url,Exception e) {
+   @Override
+   public void setDownloadFileListener(DownloadFileListener listener){
 
-    }
-
-    @Override
-    public void onResponse(String url) {
-
-    }
-
-    @Override
-    public void onComplete(String url) {
-
-    }
+   }
 
     @Override
     public void onDestroy() {

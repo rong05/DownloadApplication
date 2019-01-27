@@ -9,7 +9,7 @@ import okhttp3.Response;
 /**
  * 文件下载的执行者
  */
-public class DownloadExecutor implements Runnable{
+public final class DownloadExecutor {
 
     private final String url;
     private final int runId;
@@ -17,23 +17,23 @@ public class DownloadExecutor implements Runnable{
     private final DownloadFileCallback mDownloadFileCallback;
 
 
-    public DownloadExecutor(String url, int runId, DownloadFileCallback downloadFileCallback){
+    protected DownloadExecutor(String url, int runId, DownloadFileCallback downloadFileCallback){
         this.url = url;
         this.runId = runId;
         this.mDownloadCallback = new DownloadCallback();
         this.mDownloadFileCallback = downloadFileCallback;
     }
 
+
     /**
      * 文件下载回调
      */
     public interface DownloadFileCallback{
         void onFailure(IOException e);
-        void onResponse(String url,int runId);
+        void onResponse(String url,int runId,Response response);
     }
 
-    @Override
-    public void run() {
+    protected void run() {
         try {
             HttpUtils.getInstance().downloadAsyncFile(url,mDownloadCallback);
         } catch (IOException e) {
@@ -55,7 +55,54 @@ public class DownloadExecutor implements Runnable{
 
         @Override
         public void onResponse(Call call, Response response) throws IOException {
-            mDownloadFileCallback.onResponse(url,runId);
+            mDownloadFileCallback.onResponse(url,runId,response);
+        }
+    }
+
+
+    public final static class Builder{
+
+        private  String url;
+        private  int runId = -1;
+        private  DownloadFileCallback mDownloadFileCallback;
+
+        public Builder(){
+        }
+
+        public DownloadExecutor.Builder setUrl(String url) {
+            this.url = url;
+            return this;
+        }
+
+        public DownloadExecutor.Builder setRunId(int runId) {
+            this.runId = runId;
+            return this;
+        }
+
+        public DownloadExecutor.Builder setDownloadFileCallback(DownloadFileCallback mDownloadFileCallback) {
+            this.mDownloadFileCallback = mDownloadFileCallback;
+            return this;
+        }
+
+        public DownloadExecutor create() {
+            if(url == null || "".equals(url)){
+                throw new NullPointerException("DownloadExecutor url is null");
+            }
+            if(mDownloadFileCallback == null){
+                throw new NullPointerException("DownloadExecutor mDownloadFileCallback is null");
+            }
+            if(runId == -1){
+                throw new NullPointerException("DownloadExecutor runId is -1");
+            }
+
+            DownloadExecutor executor = new DownloadExecutor(url,runId,mDownloadFileCallback);
+            return executor;
+        }
+
+        public DownloadExecutor run(){
+            DownloadExecutor executor = this.create();
+            executor.run();
+            return executor;
         }
     }
 }

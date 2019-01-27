@@ -4,15 +4,19 @@ public class FileTmp {
      final long startPath ;
      final long endPath ;
      final String fileName ;
-     final String url;
+     final String downloadUrl;
+     final String tagUrl;
      final int runId;
+    final String savePath;
 
-    public FileTmp(long startPath, long endPath, String fileName, String url, int runId) {
+    public FileTmp(long startPath, long endPath, String fileName, String downloadUrl,String tagUrl, int runId,String savePath) {
         this.startPath = startPath;
         this.endPath = endPath;
         this.fileName = fileName;
-        this.url = url;
+        this.downloadUrl = downloadUrl;
+        this.tagUrl = tagUrl;
         this.runId = runId;
+        this.savePath = savePath;
     }
 
     @Override
@@ -21,8 +25,10 @@ public class FileTmp {
                 "startPath=" + startPath +
                 ", endPath=" + endPath +
                 ", fileName='" + fileName + '\'' +
-                ", url='" + url + '\'' +
+                ", downloadUrl='" + downloadUrl + '\'' +
+                ", tagUrl='" + tagUrl + '\'' +
                 ", runId=" + runId +
+                ", savePath='" + savePath + '\'' +
                 '}';
     }
 }
