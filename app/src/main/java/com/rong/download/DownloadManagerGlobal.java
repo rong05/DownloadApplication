@@ -13,6 +13,9 @@ import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingDeque;
 
+/**
+ * 下载
+ */
 public final class DownloadManagerGlobal implements CPModel,IDownloadManager{
 
 
@@ -21,7 +24,7 @@ public final class DownloadManagerGlobal implements CPModel,IDownloadManager{
     private DownloadFileListener mDownloadFileListener;
     private  static volatile DownloadManagerGlobal sDownloadManagerGlobal = null;
     private final ConcurrentHashMap<String,FileTask> fileTaskMap;
-    private long maxCacheFileSize = 1024l * 1024l;
+    private long maxCacheFileSize = 10240 * 10240;
 
     private DownloadManagerGlobal(){
         fileTmpQueue = new LinkedBlockingDeque<>();

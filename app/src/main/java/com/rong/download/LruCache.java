@@ -1,7 +1,6 @@
 package com.rong.download;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -65,11 +64,11 @@ public class LruCache<K, V> {
     private final ReadWriteLock rwLock;
 
 
-    static class Entry<K, V> {
-        Entry<K, V> before;
-        Entry<K, V> after;
-        final V value;
-        final K key;
+    private static class Entry<K, V> {
+        Entry<K, V> before;//上一个节点
+        Entry<K, V> after;//下一个节点
+        final V value;//保存的内容
+        final K key;//键
 
         Entry(K key, V value) {
             this.key = key;
@@ -82,6 +81,19 @@ public class LruCache<K, V> {
 
         public K getKey() {
             return key;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Entry)) return false;
+            Entry<?, ?> entry = (Entry<?, ?>) o;
+            return getKey().equals(entry.getKey());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getKey());
         }
     }
 
@@ -109,9 +121,11 @@ public class LruCache<K, V> {
         if (maxSize <= 0) {
             throw new IllegalArgumentException("maxSize <= 0");
         }
-
-        synchronized (this) {
+        rwLock.writeLock().lock();
+        try {
             this.maxSize = maxSize;
+        }finally {
+            rwLock.writeLock().unlock();
         }
         trimToSize(maxSize);
     }
@@ -133,7 +147,7 @@ public class LruCache<K, V> {
         }
     }
 
-    // LinkedHashMap newNode 的实现
+    // newNode 的实现
     private Entry<K, V> newNode(K key, V value) {
         Entry<K, V> p = new Entry<K, V>(key, value);
         // 将 Entry 接在双向链表的尾部
@@ -213,9 +227,9 @@ public class LruCache<K, V> {
                 }
                 missCount++;
             } finally {
+                rwLock.readLock().lock();
                 rwLock.writeLock().unlock();
             }
-            rwLock.readLock().lock();
         } finally {
             rwLock.readLock().unlock();
             if (mapValue != null) {
@@ -307,45 +321,39 @@ public class LruCache<K, V> {
             K key;
             V value;
             rwLock.readLock().lock();
+            if (size < 0 || (map.isEmpty() && size != 0)) {
+                rwLock.readLock().unlock();
+                throw new IllegalStateException(getClass().getName()
+                        + ".sizeOf() is reporting inconsistent results!");
+            }
+
+            if (size <= maxSize) {//检查是否超过最大缓存数
+                rwLock.readLock().unlock();
+                break;
+            }
+            Entry<K, V> toEvict = head;//取出头部
+            if (toEvict == null) {
+                rwLock.readLock().unlock();
+                break;
+            }
+
+            key = toEvict.getKey();
+            value = toEvict.getValue();
+            Entry<K, V> previous;
+            rwLock.readLock().unlock();//读取锁不可能升级成写入锁
+            rwLock.writeLock().lock();
             try {
-                if (size < 0 || (map.isEmpty() && size != 0)) {
-                    rwLock.readLock().unlock();
-                    throw new IllegalStateException(getClass().getName()
-                            + ".sizeOf() is reporting inconsistent results!");
-                }
-
-                if (size <= maxSize) {
-                    rwLock.readLock().unlock();
-                    break;
-                }
-                Entry<K, V> toEvict = head;
-                if (toEvict == null) {
-                    rwLock.readLock().unlock();
-                    break;
-                }
-
-                key = toEvict.getKey();
-                value = toEvict.getValue();
-                try {
-                    Entry<K, V> previous;
-                    rwLock.readLock().unlock();
-                    rwLock.writeLock().lock();
-                    try {
-                        previous = map.remove(key);
-                        if (previous != null) {
-                            afterNodeRemoval(previous);
-                            size -= safeSizeOf(key, value);
-                            evictionCount++;
-                        }
-                    } finally {
-                        rwLock.writeLock().unlock();
-                    }
-                } finally {
-                    rwLock.readLock().lock();
+                previous = map.remove(key);
+                if (previous != null) {
+                    afterNodeRemoval(previous);//删除节点
+                    size -= safeSizeOf(key, value);
+                    evictionCount++;
                 }
             } finally {
-                rwLock.readLock().unlock();
+                rwLock.readLock().lock();//写入锁可以降级为读取锁
+                rwLock.writeLock().unlock();
             }
+            rwLock.readLock().unlock();
             entryRemoved(true, key, value, null);
         }
     }
@@ -379,6 +387,23 @@ public class LruCache<K, V> {
         return previous != null ? previous.getValue() : null;
     }
 
+
+    public final Iterator<Entry<K,V>> iterator(){
+        final Set<Entry<K,V>> vSet = new LinkedHashSet<>();
+        rwLock.readLock().lock();
+        try {
+            Entry<K,V> e = head;
+            while (e != tail.after){
+                vSet.add(e);
+                Entry<K,V> a = e.after;
+                e = a;
+            }
+        }finally {
+            rwLock.readLock().unlock();
+        }
+
+        return vSet.iterator();
+    }
     /**
      * Called for entries that have been evicted or removed. This method is
      * invoked when a value is evicted to make space, removed by a call to
@@ -447,7 +472,14 @@ public class LruCache<K, V> {
      * of entries in the cache. For all other caches, this returns the sum of
      * the sizes of the entries in this cache.
      */
-    public synchronized final int size() {
+    public  final int size() {
+        int size = -1;
+        rwLock.readLock().lock();
+        try {
+            size = this.size;
+        }finally {
+            rwLock.readLock().unlock();
+        }
         return size;
     }
 
@@ -456,7 +488,14 @@ public class LruCache<K, V> {
      * number of entries in the cache. For all other caches, this returns the
      * maximum sum of the sizes of the entries in this cache.
      */
-    public synchronized final int maxSize() {
+    public  final int maxSize() {
+        int maxSize = -1;
+        rwLock.readLock().lock();
+        try {
+            maxSize = this.maxSize;
+        }finally {
+            rwLock.readLock().unlock();
+        }
         return maxSize;
     }
 
@@ -464,7 +503,14 @@ public class LruCache<K, V> {
      * Returns the number of times {@link #get} returned a value that was
      * already present in the cache.
      */
-    public synchronized final int hitCount() {
+    public final int hitCount() {
+        int hitCount = -1;
+        rwLock.readLock().lock();
+        try {
+            hitCount = this.hitCount;
+        }finally {
+            rwLock.readLock().unlock();
+        }
         return hitCount;
     }
 
@@ -472,28 +518,56 @@ public class LruCache<K, V> {
      * Returns the number of times {@link #get} returned null or required a new
      * value to be created.
      */
-    public synchronized final int missCount() {
+    public  final int missCount() {
+        int missCount = -1;
+        rwLock.readLock().lock();
+        try {
+            missCount = this.missCount;
+        }finally {
+            rwLock.readLock().unlock();
+        }
         return missCount;
     }
 
     /**
      * Returns the number of times {@link #create(Object)} returned a value.
      */
-    public synchronized final int createCount() {
+    public final int createCount() {
+        int createCount = -1;
+        rwLock.readLock().lock();
+        try {
+            createCount = this.createCount;
+        }finally {
+            rwLock.readLock().unlock();
+        }
         return createCount;
     }
 
     /**
      * Returns the number of times {@link #put} was called.
      */
-    public synchronized final int putCount() {
+    public final int putCount() {
+        int putCount = -1;
+        rwLock.readLock().lock();
+        try {
+            putCount = this.putCount;
+        }finally {
+            rwLock.readLock().unlock();
+        }
         return putCount;
     }
 
     /**
      * Returns the number of values that have been evicted.
      */
-    public synchronized final int evictionCount() {
+    public final int evictionCount() {
+        int evictionCount = -1;
+        rwLock.readLock().lock();
+        try {
+            evictionCount = this.evictionCount;
+        }finally {
+            rwLock.readLock().unlock();
+        }
         return evictionCount;
     }
 
@@ -501,16 +575,41 @@ public class LruCache<K, V> {
      * Returns a copy of the current contents of the cache, ordered from least
      * recently accessed to most recently accessed.
      */
-    public synchronized final Map<K, Entry<K, V>> snapshot() {
+    /** public synchronized final Map<K, Entry<K, V>> snapshot() {
         return new HashMap<K, Entry<K, V>>(map);
-    }
+    }*/
 
     @Override
-    public synchronized final String toString() {
-        int accesses = hitCount + missCount;
-        int hitPercent = accesses != 0 ? (100 * hitCount / accesses) : 0;
-        return String.format("LruCache[maxSize=%d,hits=%d,misses=%d,hitRate=%d%%]",
-                maxSize, hitCount, missCount, hitPercent);
+    public final String toString() {
+        String s = null;
+        rwLock.readLock().lock();
+        try {
+            int accesses = hitCount + missCount;
+            int hitPercent = accesses != 0 ? (100 * hitCount / accesses) : 0;
+            s = String.format("LruCache[maxSize=%d,hits=%d,misses=%d,hitRate=%d%%]",
+                    maxSize, hitCount, missCount, hitPercent);
+        }finally {
+            rwLock.readLock().unlock();
+        }
+        return s;
+    }
+
+    public final String toAllValueString(){
+        final StringBuffer SB = new StringBuffer();
+        SB.append("[");
+        Iterator<Entry<K,V>> iterator = iterator();
+        while (iterator.hasNext()){
+            final Entry<K,V> e = iterator.next();
+            if(e != null){
+                SB.append("(");
+                SB.append(e.getKey().toString());
+                SB.append(",");
+                SB.append(e.getValue().toString());
+                SB.append("),");
+            }
+        }
+        SB.append("]");
+        return SB.toString();
     }
 }
 
